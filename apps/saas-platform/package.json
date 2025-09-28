@@ -1,40 +1,44 @@
 {
-  "name": "@cascade/saas-platform",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@univerjs/core": "workspace:*",
-    "@univerjs/docs": "workspace:*",
-    "@univerjs/docs-ui": "workspace:*",
-    "@univerjs/engine-render": "workspace:*",
-    "@univerjs/sheets": "workspace:*",
-    "@univerjs/sheets-ui": "workspace:*",
-    "@univerjs/sheets-formula": "workspace:*",
-    "@univerjs/sheets-formula-ui": "workspace:*",
-    "@univerjs/ui": "workspace:*",
-    "@supabase/supabase-js": "^2.39.0",
-    "@supabase/auth-helpers-nextjs": "^0.8.7",
-    "next": "14.2.5",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "ws": "^8.16.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "19.1.10",
-    "@types/react-dom": "19.1.7",
-    "@types/jsonwebtoken": "^9.0.5",
-    "@types/ws": "^8.5.10",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.5",
-    "typescript": "^5"
-  }
+    "name": "@cascade/saas-platform",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@supabase/auth-helpers-nextjs": "^0.8.7",
+        "@supabase/supabase-js": "^2.39.0",
+        "@univerjs/core": "workspace:*",
+        "@univerjs/docs": "workspace:*",
+        "@univerjs/docs-ui": "workspace:*",
+        "@univerjs/engine-render": "workspace:*",
+        "@univerjs/sheets": "workspace:*",
+        "@univerjs/sheets-formula": "workspace:*",
+        "@univerjs/sheets-formula-ui": "workspace:*",
+        "@univerjs/sheets-ui": "workspace:*",
+        "@univerjs/ui": "workspace:*",
+        "jsonwebtoken": "^9.0.2",
+        "lucide-react": "^0.544.0",
+        "next": "14.2.5",
+        "react": "19.1.1",
+        "react-dom": "19.1.1",
+        "ws": "^8.16.0"
+    },
+    "devDependencies": {
+        "@types/jsonwebtoken": "^9.0.5",
+        "@types/node": "^20",
+        "@types/react": "19.1.10",
+        "@types/react-dom": "19.1.7",
+        "@types/ws": "^8.5.10",
+        "autoprefixer": "^10.4.16",
+        "eslint": "^8",
+        "eslint-config-next": "14.2.5",
+        "postcss": "^8.4.32",
+        "tailwindcss": "^3.4.0",
+        "typescript": "^5"
+    }
 }

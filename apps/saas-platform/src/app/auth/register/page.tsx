@@ -1,286 +1,331 @@
+/**
+ * Copyright 2023-present DreamNum Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 'use client';
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { createTenant } from '@/lib/tenant';
 import Link from 'next/link';
+import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    tenantName: '',
-    tenantSlug: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [step, setStep] = useState(1); // 1: Account, 2: Tenant
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        tenantName: '',
+        tenantSlug: '',
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [step, setStep] = useState(1); // 1: Account, 2: Tenant
 
-  const handleAccountSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    const handleAccountSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
+        if (formData.password !== formData.confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
 
-    try {
-      setLoading(true);
-      setError('');
-      
-      const { error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      });
-      
-      if (error) throw error;
-      
-      setStep(2);
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (formData.password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+        }
 
-  const handleTenantSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.tenantName.trim()) {
-      setError('Tenant name is required');
-      return;
-    }
+        try {
+            setLoading(true);
+            setError('');
 
-    if (!formData.tenantSlug.trim()) {
-      setError('Tenant slug is required');
-      return;
-    }
+            const { error } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/login`,
+                },
+            });
 
-    try {
-      setLoading(true);
-      setError('');
-      
-      const tenant = await createTenant(formData.tenantName, formData.tenantSlug);
-      
-      if (!tenant) {
-        throw new Error('Failed to create tenant');
-      }
-      
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+            if (error) throw error;
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-  };
+      // Show success message for email confirmation
+            setError(''); // Clear any previous errors
+            setSuccess('Account created successfully! Please check your email to confirm your account, then you can proceed to create your organization.');
 
-  const handleTenantNameChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tenantName: value,
-      tenantSlug: generateSlug(value)
-    }));
-  };
+            setStep(2);
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  if (step === 1) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div>
-            <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
-              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Create your account
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
-                Sign in
-              </Link>
-            </p>
-          </div>
-          
-          <form className="mt-8 space-y-6" onSubmit={handleAccountSubmit}>
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-700">{error}</div>
-              </div>
-            )}
-            
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Email address"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Password (min 6 characters)"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                  Confirm password
-                </label>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Confirm password"
-                />
-              </div>
-            </div>
+    const handleTenantSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="loading-spinner mr-2"></div>
-                ) : null}
-                {loading ? 'Creating account...' : 'Continue'}
-              </button>
-            </div>
+        if (!formData.tenantName.trim()) {
+            setError('Tenant name is required');
+            return;
+        }
 
-            <div className="text-center">
-              <Link href="/" className="font-medium text-blue-600 hover:text-blue-500">
-                ← Back to home
-              </Link>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
+        if (!formData.tenantSlug.trim()) {
+            setError('Tenant slug is required');
+            return;
+        }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
-            <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your organization
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Set up your team workspace
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleTenantSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="tenantName" className="block text-sm font-medium text-gray-700">
-                Organization name
-              </label>
-              <input
-                id="tenantName"
-                name="tenantName"
-                type="text"
-                required
-                value={formData.tenantName}
-                onChange={(e) => handleTenantNameChange(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Your organization name"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="tenantSlug" className="block text-sm font-medium text-gray-700">
-                Organization slug
-              </label>
-              <div className="mt-1 flex rounded-md shadow-sm">
-                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                  cascade.app/
-                </span>
-                <input
-                  id="tenantSlug"
-                  name="tenantSlug"
-                  type="text"
-                  required
-                  value={formData.tenantSlug}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tenantSlug: e.target.value }))}
-                  className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="organization-slug"
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                This will be your organization&apos;s unique URL
-              </p>
-            </div>
-          </div>
+        try {
+            setLoading(true);
+            setError('');
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      // Create organization data in JSON format
+            const organizationData = {
+                id: `org_${Date.now()}`, // Generate a unique ID
+                name: formData.tenantName,
+                slug: formData.tenantSlug,
+                plan: 'free',
+                created_at: new Date().toISOString(),
+                status: 'pending_verification', // Mark as pending since no DB
+            };
+
+      // Store organization data in localStorage
+            localStorage.setItem('pendingOrganization', JSON.stringify(organizationData));
+
+      // Also store in sessionStorage as backup
+            sessionStorage.setItem('pendingOrganization', JSON.stringify(organizationData));
+
+      // Redirect to login screen
+            window.location.href = '/auth/login';
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateSlug = (name: string) => {
+        return name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+    };
+
+    const handleTenantNameChange = (value: string) => {
+        setFormData((prev) => ({
+            ...prev,
+            tenantName: value,
+            tenantSlug: generateSlug(value),
+        }));
+    };
+
+    if (step === 1) {
+        return (
+            <div
+                className={`
+                  min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4
+                  sm:px-6
+                  lg:px-8
+                `}
             >
-              {loading ? (
-                <div className="loading-spinner mr-2"></div>
-              ) : null}
-              {loading ? 'Creating organization...' : 'Create organization'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+                <div className="max-w-md w-full space-y-8">
+                    <div className="text-center">
+                        <h1 className="mb-2 text-2xl font-bold text-gray-900">CASCADE</h1>
+                        <p className="text-gray-600">Create your account</p>
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Welcome to Cascade</CardTitle>
+                            <CardDescription>
+                                Create your account to get started with your workspace
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleAccountSubmit} className="space-y-4">
+                                {error && (
+                                    <div className="rounded-md bg-red-50 p-4">
+                                        <div className="text-sm text-red-700">{error}</div>
+                                    </div>
+                                )}
+
+                                {success && (
+                                    <div className="rounded-md bg-green-50 p-4">
+                                        <div className="text-sm text-green-700">{success}</div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="you@company.com"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="password">Password</Label>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                    <Input
+                                        id="confirmPassword"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    className="w-full"
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Creating account...' : 'Continue'}
+                                </Button>
+                            </form>
+
+                            <div className="mt-4 text-center">
+                                <p className="text-sm text-gray-600">
+                                    Already have an account?
+                                    {' '}
+                                    <Link
+                                        href="/auth/login"
+                                        className={`
+                                          text-blue-600 font-medium underline-offset-4
+                                          hover:text-blue-500 hover:underline
+                                        `}
+                                    >
+                                        Sign in
+                                    </Link>
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="text-center">
+                        <Link
+                            href="/"
+                            className={`
+                              text-sm text-gray-600
+                              hover:text-gray-900
+                            `}
+                        >
+                            ← Back to home
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            className={`
+              min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4
+              sm:px-6
+              lg:px-8
+            `}
+        >
+            <div className="max-w-md w-full space-y-8">
+                <div className="text-center">
+                    <h1 className="mb-2 text-2xl font-bold text-gray-900">CASCADE</h1>
+                    <p className="text-gray-600">Create your organization</p>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Set up your workspace</CardTitle>
+                        <CardDescription>
+                            Create your organization to get started with Cascade
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleTenantSubmit} className="space-y-4">
+                            {error && (
+                                <div className="rounded-md bg-red-50 p-4">
+                                    <div className="text-sm text-red-700">{error}</div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <Label htmlFor="tenantName">Organization name</Label>
+                                <Input
+                                    id="tenantName"
+                                    type="text"
+                                    placeholder="Your organization name"
+                                    value={formData.tenantName}
+                                    onChange={(e) => handleTenantNameChange(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="tenantSlug">Organization slug</Label>
+                                <div className="flex rounded-md">
+                                    <span
+                                        className={`
+                                          inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300
+                                          bg-gray-50 text-gray-500 text-sm
+                                        `}
+                                    >
+                                        cascade.app/
+                                    </span>
+                                    <Input
+                                        id="tenantSlug"
+                                        type="text"
+                                        placeholder="organization-slug"
+                                        value={formData.tenantSlug}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, tenantSlug: e.target.value }))}
+                                        className="rounded-l-none"
+                                        required
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    This will be your organization&apos;s unique URL
+                                </p>
+                            </div>
+
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={loading}
+                            >
+                                {loading ? 'Creating organization...' : 'Create organization'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
 }
