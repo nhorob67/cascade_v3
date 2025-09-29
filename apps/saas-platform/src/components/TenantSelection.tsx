@@ -98,6 +98,8 @@ export function TenantSelection({ tenants, onSelectTenant, onCreateTenant }: ITe
                     name: orgFormData.tenantName,
                     slug: orgFormData.tenantSlug,
                 });
+            } else {
+                throw new Error('onCreateTenant function not provided');
             }
 
       // Close modal and reset form

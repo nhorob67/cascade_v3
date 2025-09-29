@@ -25,7 +25,7 @@ const CreateTenantSchema = z.object({
     name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
     slug: z.string().min(1, 'Slug is required').max(100, 'Slug too long').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
     plan: z.enum(['FREE', 'PRO', 'ENTERPRISE']).optional(),
-    settings: z.record(z.any()).optional(),
+    settings: z.record(z.string(), z.unknown()).optional(),
     userId: z.string().min(1, 'User ID is required'),
 });
 
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
         const query = QuerySchema.parse(Object.fromEntries(searchParams));
 
     // Filter tenants by user - only return tenants the user belongs to
-        const where: any = {
+        const where: Record<string, unknown> = {
             tenantUsers: {
                 some: {
                     userId: query.userId,
@@ -123,6 +123,23 @@ export async function POST(req: Request) {
         }
 
         const result = await prisma.$transaction(async (tx) => {
+            // First, create or find the user
+            let user = await tx.user.findUnique({
+                where: { id: parsed.data.userId },
+            });
+
+            if (!user) {
+                // Create user if it doesn't exist (for Supabase auth users)
+                user = await tx.user.create({
+                    data: {
+                        id: parsed.data.userId,
+                        name: `User ${parsed.data.userId.slice(0, 8)}`, // Generate a default name
+                        joinedAt: new Date(),
+                    },
+                });
+            }
+
+            // Create the tenant
             const tenant = await tx.tenant.create({
                 data: {
                     name: parsed.data.name,
@@ -132,18 +149,11 @@ export async function POST(req: Request) {
                 },
             });
 
-            const _user = await tx.user.create({
-                data: {
-          // id: parsed.data.userId ?? '',
-                    name: tenant.name,
-                    joinedAt: new Date(),
-                },
-            });
-
+            // Create the tenant-user relationship
             const _tenantUser = await tx.tenantUser.create({
                 data: {
                     tenantId: tenant.id,
-                    userId: parsed.data.userId ?? '',
+                    userId: parsed.data.userId,
                 },
             });
 
@@ -163,11 +173,11 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json(result, { status: 201 });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('POST /api/tenants error:', err);
 
-        if (err.code === 'P2002') {
-            const field = err.meta?.target?.[0];
+        if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+            const field = (err as { meta?: { target?: string[] } }).meta?.target?.[0];
             return NextResponse.json({
                 error: `${field === 'slug' ? 'Slug' : 'Field'} already exists`,
             }, { status: 409 });

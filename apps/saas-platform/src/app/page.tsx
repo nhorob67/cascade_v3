@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ImageWithFallback } from '@/components/ui/ImageWithFallback';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { tenantAPI, transformTenantForUI } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
 type AppView = 'login' | 'tenant-selection' | 'dashboard' | 'documents' | 'spreadsheets' | 'presentations' | 'editor' | 'members' | 'settings';
@@ -43,6 +44,7 @@ interface IUser {
     email: string;
     name: string;
     tenants: ITenant[];
+    id: string;
 }
 
 interface ITenant {
@@ -64,17 +66,6 @@ interface IDocument {
     type: string;
 }
 
-interface IOrganization {
-    id: string;
-    name: string;
-    slug: string;
-    plan: string;
-    created_at: string;
-    status: string;
-    memberCount?: number;
-    documentCount?: number;
-}
-
 export default function App() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -89,15 +80,19 @@ export default function App() {
 
   // Check for existing user data on component mount
     useEffect(() => {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
-            setAppState((prev) => ({
-                ...prev,
-                currentUser: user,
-                currentView: 'tenant-selection',
-            }));
-        }
+        const initializeApp = () => {
+            const storedUser = localStorage.getItem('currentUser');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                setAppState((prev) => ({
+                    ...prev,
+                    currentUser: user,
+                    currentView: 'tenant-selection',
+                }));
+            }
+        };
+
+        initializeApp();
     }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -107,43 +102,58 @@ export default function App() {
             setLoading(true);
             setError('');
 
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (error) throw error;
 
-      // Get organizations from localStorage
-            const pendingOrganizations = JSON.parse(localStorage.getItem('pendingOrganization') || '[]');
+            // Get user ID from Supabase auth
+            const userId = data.user?.id;
+            if (!userId) {
+                throw new Error('User ID not found');
+            }
 
-      // Transform localStorage data to match Tenant interface
-            const transformToTenant = (org: IOrganization): ITenant => ({
-                id: org.id,
-                name: org.name,
-                plan: (org.plan === 'free' ? 'Free' : org.plan === 'pro' ? 'Pro' : 'Enterprise') as 'Free' | 'Pro' | 'Enterprise',
-                memberCount: org.memberCount || 1,
-                documentCount: org.documentCount || 0,
-            });
+            // Check for pending tenant data from registration
+            const pendingTenantData = JSON.parse(localStorage.getItem('pendingTenantData') || 'null');
 
-      // Ensure tenants is always an array and transform the data
-            const tenantsArray = Array.isArray(pendingOrganizations)
-                ? pendingOrganizations.map(transformToTenant)
-                : pendingOrganizations
-                    ? [transformToTenant(pendingOrganizations)]
-                    : [];
+            // If there's pending tenant data and the email matches, create the tenant
+            if (pendingTenantData && pendingTenantData.email === email) {
+                try {
+                    await tenantAPI.createTenant({
+                        name: pendingTenantData.name,
+                        slug: pendingTenantData.slug,
+                        userId,
+                        plan: pendingTenantData.plan,
+                    });
 
-      // Create user data with organizations from localStorage only
+                    // Clear pending data after successful creation
+                    localStorage.removeItem('pendingTenantData');
+                } catch (tenantError) {
+                    console.error('Failed to create pending tenant:', tenantError);
+                    // Continue with login even if tenant creation fails
+                }
+            }
+
+            // Fetch organizations from API
+            const apiTenants = await tenantAPI.getTenantsByUserId(userId);
+
+            // Transform API tenants to UI format
+            const tenantsArray = apiTenants.map(transformTenantForUI);
+
+            // Create user data with organizations from API
             const user = {
                 email,
-                name: 'John Doe',
+                name: data.user?.user_metadata?.name || 'User',
                 tenants: tenantsArray,
+                id: userId,
             };
 
-      // Store user data in localStorage
+            // Store user data in localStorage
             localStorage.setItem('currentUser', JSON.stringify(user));
 
-      // Set user and show tenant selection
+            // Set user and show tenant selection
             setAppState((prev) => ({
                 ...prev,
                 currentUser: user,
@@ -210,41 +220,35 @@ export default function App() {
 
     const handleCreateTenant = async (tenantData: { name: string; slug: string }) => {
         try {
-      // Create organization data in JSON format
-            const organizationData = {
-                id: `org_${Date.now()}`,
+            // Get user ID from current user
+            const userId = appState.currentUser?.id;
+            if (!userId) {
+                throw new Error('User not authenticated');
+            }
+
+            // Create organization via API
+            const newTenant = await tenantAPI.createTenant({
                 name: tenantData.name,
                 slug: tenantData.slug,
-                plan: 'free',
-                created_at: new Date().toISOString(),
-                status: 'pending_verification',
-            };
-
-      // Store organization data in localStorage
-            localStorage.setItem('pendingOrganization', JSON.stringify(organizationData));
-
-      // Transform the new organization to match Tenant interface
-            const transformToTenant = (org: IOrganization): ITenant => ({
-                id: org.id,
-                name: org.name,
-                plan: (org.plan === 'free' ? 'Free' : org.plan === 'pro' ? 'Pro' : 'Enterprise') as 'Free' | 'Pro' | 'Enterprise',
-                memberCount: org.memberCount || 1,
-                documentCount: org.documentCount || 0,
+                userId,
+                plan: 'FREE',
             });
 
-            const newTenant = transformToTenant(organizationData);
+            // Transform the new tenant to UI format
+            const uiTenant = transformTenantForUI(newTenant);
 
-      // Update user's tenants list
+            // Update user's tenants list
             const currentTenants = appState.currentUser?.tenants || [];
-            const updatedTenants = [...currentTenants, newTenant];
+            const updatedTenants = [...currentTenants, uiTenant];
 
             const updatedUser: IUser = {
                 email: appState.currentUser?.email || '',
                 name: appState.currentUser?.name || '',
                 tenants: updatedTenants,
+                id: userId,
             };
 
-      // Update localStorage and state
+            // Update localStorage and state
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));
             setAppState((prev) => ({
                 ...prev,

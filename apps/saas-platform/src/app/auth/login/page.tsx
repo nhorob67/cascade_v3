@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ImageWithFallback } from '@/components/ui/ImageWithFallback';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { tenantAPI, transformTenantForUI } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -38,44 +39,59 @@ export default function LoginPage() {
             setLoading(true);
             setError('');
 
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (error) throw error;
 
-      // Get organizations from localStorage
-            const pendingOrganizations = JSON.parse(localStorage.getItem('pendingOrganization') || '[]');
+            // Get user ID from Supabase auth
+            const userId = data.user?.id;
+            if (!userId) {
+                throw new Error('User ID not found');
+            }
 
-      // Transform localStorage data to match Tenant interface
-            const transformToTenant = (org: any) => ({
-                id: org.id,
-                name: org.name,
-                plan: org.plan === 'free' ? 'Free' : org.plan === 'pro' ? 'Pro' : 'Enterprise',
-                memberCount: org.memberCount || 1,
-                documentCount: org.documentCount || 0,
-            });
+            // Check for pending tenant data from registration
+            const pendingTenantData = JSON.parse(localStorage.getItem('pendingTenantData') || 'null');
 
-      // Ensure tenants is always an array and transform the data
-            const tenantsArray = Array.isArray(pendingOrganizations)
-                ? pendingOrganizations.map(transformToTenant)
-                : pendingOrganizations
-                    ? [transformToTenant(pendingOrganizations)]
-                    : [];
+            // If there's pending tenant data and the email matches, create the tenant
+            if (pendingTenantData && pendingTenantData.email === email) {
+                try {
+                    await tenantAPI.createTenant({
+                        name: pendingTenantData.name,
+                        slug: pendingTenantData.slug,
+                        userId,
+                        plan: pendingTenantData.plan,
+                    });
 
-      // Create user data with organizations from localStorage only
+                    // Clear pending data after successful creation
+                    localStorage.removeItem('pendingTenantData');
+                } catch (tenantError) {
+                    console.error('Failed to create pending tenant:', tenantError);
+                    // Continue with login even if tenant creation fails
+                }
+            }
+
+            // Fetch organizations from API
+            const apiTenants = await tenantAPI.getTenantsByUserId(userId);
+
+            // Transform API tenants to UI format
+            const tenantsArray = apiTenants.map(transformTenantForUI);
+
+            // Create user data with organizations from API
             const user = {
                 email,
-                name: 'John Doe',
+                name: data.user?.user_metadata?.name || 'User',
                 tenants: tenantsArray,
+                id: userId,
             };
 
-      // Store user data in localStorage and redirect to main page
+            // Store user data in localStorage and redirect to main page
             localStorage.setItem('currentUser', JSON.stringify(user));
             window.location.href = '/';
-        } catch (error: any) {
-            setError(error.message);
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'An error occurred');
         } finally {
             setLoading(false);
         }

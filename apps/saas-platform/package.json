@@ -10,6 +10,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@prisma/client": "^6.16.2",
         "@supabase/auth-helpers-nextjs": "^0.8.7",
         "@supabase/supabase-js": "^2.39.0",
         "@univerjs/core": "workspace:*",
@@ -26,7 +27,8 @@
         "next": "14.2.5",
         "react": "19.1.1",
         "react-dom": "19.1.1",
-        "ws": "^8.16.0"
+        "ws": "^8.16.0",
+        "zod": "^4.1.11"
     },
     "devDependencies": {
         "@types/jsonwebtoken": "^9.0.5",
@@ -38,6 +40,7 @@
         "eslint": "^8",
         "eslint-config-next": "14.2.5",
         "postcss": "^8.4.32",
+        "prisma": "^6.16.2",
         "tailwindcss": "^3.4.0",
         "typescript": "^5"
     }

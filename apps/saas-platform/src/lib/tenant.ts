@@ -18,20 +18,19 @@ export async function getUserTenantContext(userId: string): Promise<TenantContex
   try {
     // Get user's tenant relationships
     const { data: tenantUsers, error } = await supabase
-      .from('tenant_users')
+      .from('tenants_and_users')
       .select(`
-        role,
         tenant:tenants (
           id,
           name,
           slug,
           plan,
           settings,
-          created_at,
-          updated_at
+          createdAt,
+          updatedAt
         )
       `)
-      .eq('user_id', userId)
+      .eq('userId', userId)
       .single();
 
     if (error || !tenantUsers) {
@@ -45,7 +44,7 @@ export async function getUserTenantContext(userId: string): Promise<TenantContex
     return {
       tenant: (tenantUsers as any).tenant as Tenant,
       user,
-      role: tenantUsers.role
+      role: 'owner' // Default role since it's not in the schema
     };
   } catch (error) {
     console.error('Error in getUserTenantContext:', error);
@@ -77,12 +76,10 @@ export async function createTenant(name: string, slug: string, plan: 'free' | 'p
 
     // Add user to tenant as owner
     const { error: memberError } = await supabase
-      .from('tenant_users')
+      .from('tenants_and_users')
       .insert({
-        tenant_id: tenant.id,
-        user_id: user.id,
-        role: 'owner',
-        joined_at: new Date().toISOString()
+        tenantId: tenant.id,
+        userId: user.id
       });
 
     if (memberError) {

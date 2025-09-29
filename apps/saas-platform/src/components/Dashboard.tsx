@@ -55,9 +55,9 @@ interface ITenant {
 
 interface IDashboardProps {
     tenant: ITenant;
-    onNavigate: (view: string, data?: any) => void;
+    onNavigate: (view: string, data?: unknown) => void;
     onLogout: () => void;
-    user: any;
+    user: { name?: string; email?: string } | null;
 }
 
 export function Dashboard({ tenant, onNavigate, onLogout, user }: IDashboardProps) {
@@ -153,7 +153,10 @@ export function Dashboard({ tenant, onNavigate, onLogout, user }: IDashboardProp
                                             {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <span>{user?.name || user?.email || 'User'}</span>
+                                    <span>
+                                        {user?.name ||
+                                         (user?.email ? user.email.split('@')[0] : 'User')}
+                                    </span>
                                     <ChevronDown className="w-4 h-4" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -184,6 +187,7 @@ export function Dashboard({ tenant, onNavigate, onLogout, user }: IDashboardProp
                         <nav className="space-y-2">
                             {sidebarItems.map((item) => (
                                 <button
+                                    type="button"
                                     key={item.id}
                                     onClick={() => item.active && !item.comingSoon && setActiveTab(item.id)}
                                     className={`

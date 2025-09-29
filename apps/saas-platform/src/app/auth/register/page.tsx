@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { tenantAPI } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
@@ -69,8 +70,8 @@ export default function RegisterPage() {
             setSuccess('Account created successfully! Please check your email to confirm your account, then you can proceed to create your organization.');
 
             setStep(2);
-        } catch (error: any) {
-            setError(error.message);
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'An error occurred');
         } finally {
             setLoading(false);
         }
@@ -93,26 +94,55 @@ export default function RegisterPage() {
             setLoading(true);
             setError('');
 
-      // Create organization data in JSON format
-            const organizationData = {
-                id: `org_${Date.now()}`, // Generate a unique ID
-                name: formData.tenantName,
-                slug: formData.tenantSlug,
-                plan: 'free',
-                created_at: new Date().toISOString(),
-                status: 'pending_verification', // Mark as pending since no DB
-            };
+            // Get the current session to check if user is authenticated
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      // Store organization data in localStorage
-            localStorage.setItem('pendingOrganization', JSON.stringify(organizationData));
+            if (sessionError || !session?.user) {
+                // If no session, try to get user from auth state
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      // Also store in sessionStorage as backup
-            sessionStorage.setItem('pendingOrganization', JSON.stringify(organizationData));
+                if (userError || !user) {
+                    // User not authenticated yet, store data for later
+                    const pendingTenantData = {
+                        name: formData.tenantName,
+                        slug: formData.tenantSlug,
+                        plan: 'FREE',
+                        email: formData.email,
+                    };
 
-      // Redirect to login screen
-            window.location.href = '/auth/login';
-        } catch (error: any) {
-            setError(error.message);
+                    localStorage.setItem('pendingTenantData', JSON.stringify(pendingTenantData));
+                    setError('');
+                    setSuccess('Organization data saved! Please check your email to confirm your account, then sign in to complete the setup.');
+                    setStep(3);
+                    return;
+                }
+
+                // User is authenticated, create tenant via API
+                await tenantAPI.createTenant({
+                    name: formData.tenantName,
+                    slug: formData.tenantSlug,
+                    userId: user.id,
+                    plan: 'FREE',
+                });
+
+                setError('');
+                setSuccess('Organization created successfully! You can now sign in to access your workspace.');
+                setStep(3);
+            } else {
+                // User is authenticated, create tenant via API
+                await tenantAPI.createTenant({
+                    name: formData.tenantName,
+                    slug: formData.tenantSlug,
+                    userId: session.user.id,
+                    plan: 'FREE',
+                });
+
+                setError('');
+                setSuccess('Organization created successfully! You can now sign in to access your workspace.');
+                setStep(3);
+            }
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'Failed to create organization');
         } finally {
             setLoading(false);
         }
@@ -248,6 +278,96 @@ export default function RegisterPage() {
         );
     }
 
+    if (step === 2) {
+        return (
+            <div
+                className={`
+                  min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4
+                  sm:px-6
+                  lg:px-8
+                `}
+            >
+                <div className="max-w-md w-full space-y-8">
+                    <div className="text-center">
+                        <h1 className="mb-2 text-2xl font-bold text-gray-900">CASCADE</h1>
+                        <p className="text-gray-600">Create your organization</p>
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Set up your workspace</CardTitle>
+                            <CardDescription>
+                                Create your organization to get started with Cascade
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleTenantSubmit} className="space-y-4">
+                                {error && (
+                                    <div className="rounded-md bg-red-50 p-4">
+                                        <div className="text-sm text-red-700">{error}</div>
+                                    </div>
+                                )}
+
+                                {success && (
+                                    <div className="rounded-md bg-green-50 p-4">
+                                        <div className="text-sm text-green-700">{success}</div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="tenantName">Organization name</Label>
+                                    <Input
+                                        id="tenantName"
+                                        type="text"
+                                        placeholder="Your organization name"
+                                        value={formData.tenantName}
+                                        onChange={(e) => handleTenantNameChange(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="tenantSlug">Organization slug</Label>
+                                    <div className="flex rounded-md">
+                                        <span
+                                            className={`
+                                              inline-flex items-center px-3 rounded-l-md border border-r-0
+                                              border-gray-300 bg-gray-50 text-gray-500 text-sm
+                                            `}
+                                        >
+                                            cascade.app/
+                                        </span>
+                                        <Input
+                                            id="tenantSlug"
+                                            type="text"
+                                            placeholder="organization-slug"
+                                            value={formData.tenantSlug}
+                                            onChange={(e) => setFormData((prev) => ({ ...prev, tenantSlug: e.target.value }))}
+                                            className="rounded-l-none"
+                                            required
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                        This will be your organization&apos;s unique URL
+                                    </p>
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    className="w-full"
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Creating organization...' : 'Create organization'}
+                                </Button>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+
+    // Step 3: Success
     return (
         <div
             className={`
@@ -259,70 +379,42 @@ export default function RegisterPage() {
             <div className="max-w-md w-full space-y-8">
                 <div className="text-center">
                     <h1 className="mb-2 text-2xl font-bold text-gray-900">CASCADE</h1>
-                    <p className="text-gray-600">Create your organization</p>
+                    <p className="text-gray-600">Setup complete!</p>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Set up your workspace</CardTitle>
+                        <CardTitle>Welcome to Cascade!</CardTitle>
                         <CardDescription>
-                            Create your organization to get started with Cascade
+                            Your account and organization have been created successfully
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleTenantSubmit} className="space-y-4">
-                            {error && (
-                                <div className="rounded-md bg-red-50 p-4">
-                                    <div className="text-sm text-red-700">{error}</div>
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <Label htmlFor="tenantName">Organization name</Label>
-                                <Input
-                                    id="tenantName"
-                                    type="text"
-                                    placeholder="Your organization name"
-                                    value={formData.tenantName}
-                                    onChange={(e) => handleTenantNameChange(e.target.value)}
-                                    required
-                                />
+                    <CardContent className="space-y-4">
+                        {success && (
+                            <div className="rounded-md bg-green-50 p-4">
+                                <div className="text-sm text-green-700">{success}</div>
                             </div>
+                        )}
 
-                            <div className="space-y-2">
-                                <Label htmlFor="tenantSlug">Organization slug</Label>
-                                <div className="flex rounded-md">
-                                    <span
-                                        className={`
-                                          inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300
-                                          bg-gray-50 text-gray-500 text-sm
-                                        `}
-                                    >
-                                        cascade.app/
-                                    </span>
-                                    <Input
-                                        id="tenantSlug"
-                                        type="text"
-                                        placeholder="organization-slug"
-                                        value={formData.tenantSlug}
-                                        onChange={(e) => setFormData((prev) => ({ ...prev, tenantSlug: e.target.value }))}
-                                        className="rounded-l-none"
-                                        required
-                                    />
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                    This will be your organization&apos;s unique URL
-                                </p>
-                            </div>
+                        <div className="text-center">
+                            <Link href="/auth/login">
+                                <Button className="w-full">
+                                    Sign in to your account
+                                </Button>
+                            </Link>
+                        </div>
 
-                            <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={loading}
+                        <div className="text-center">
+                            <Link
+                                href="/"
+                                className={`
+                                  text-sm text-gray-600
+                                  hover:text-gray-900
+                                `}
                             >
-                                {loading ? 'Creating organization...' : 'Create organization'}
-                            </Button>
-                        </form>
+                                ← Back to home
+                            </Link>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
